@@ -58,29 +58,38 @@ public class NotificationRepository {
     }
 
     /**
-     * Забирает пачку неотправленных уведомлений, блокируя их за собой.
+     * Неотправленное уведомление, заблокированное за текущей транзакцией.
      *
-     * <p>{@code FOR UPDATE SKIP LOCKED} — способ раздать очередь нескольким экземплярам
-     * приложения без внешнего координатора. Первый процесс блокирует выбранные строки,
-     * второй их молча пропускает и берёт следующие. Без этого оба прочитали бы одни и те же
-     * PENDING-строки и отправили каждое уведомление дважды.
-     *
-     * <p>Без {@code SKIP LOCKED} второй процесс не продублировал бы отправку, но встал бы
-     * в ожидание блокировки — очередь разбиралась бы строго последовательно.
-     *
-     * <p>Обязательное условие: вызывать внутри транзакции. Блокировка живёт до её конца,
-     * то есть до момента, когда статус уже переписан на SENT.
+     * <p>{@code SKIP LOCKED}: если строку уже держит другой обработчик, она просто не находится,
+     * и второй обработчик ничего не делает — вместо того чтобы ждать и отправить то же самое
+     * следом. Вызывать только внутри транзакции: блокировка живёт до её конца.
      */
-    public List<Notification> lockPending(int limit) {
+    public Optional<Notification> lockPendingById(Long notificationId) {
         return jdbc.query(
                 SELECT_NOTIFICATION + """
-                         WHERE n.status = :status
-                         ORDER BY n.created_at, n.id
-                         LIMIT :limit
+                         WHERE n.id = :notificationId
+                           AND n.status = :status
                          FOR UPDATE SKIP LOCKED
                         """,
                 new MapSqlParameterSource()
+                        .addValue("notificationId", notificationId)
+                        .addValue("status", NotificationStatus.PENDING.name()),
+                NOTIFICATION
+        ).stream().findFirst();
+    }
+
+    /** Неотправленные уведомления, созданные раньше {@code createdBefore}, — самые старые первыми. */
+    public List<Notification> findPendingCreatedBefore(OffsetDateTime createdBefore, int limit) {
+        return jdbc.query(
+                SELECT_NOTIFICATION + """
+                         WHERE n.status = :status
+                           AND n.created_at < :createdBefore
+                         ORDER BY n.created_at, n.id
+                         LIMIT :limit
+                        """,
+                new MapSqlParameterSource()
                         .addValue("status", NotificationStatus.PENDING.name())
+                        .addValue("createdBefore", createdBefore)
                         .addValue("limit", limit),
                 NOTIFICATION
         );

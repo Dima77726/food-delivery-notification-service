@@ -10,9 +10,10 @@ import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.rabbitmq.RabbitMQContainer;
 
 /**
- * Настоящие PostgreSQL и Kafka для тестов сервиса.
+ * Настоящие PostgreSQL, Kafka и RabbitMQ для тестов сервиса.
  *
  * <p>Образ брокера — Confluent, а не apache/kafka из compose. Причина та же, что в монолите:
  * обёртка образа apache/kafka не уживается со способом, которым Testcontainers выставляет
@@ -31,6 +32,16 @@ public class TestcontainersConfiguration {
     @ServiceConnection
     ConfluentKafkaContainer kafkaContainer() {
         return new ConfluentKafkaContainer("confluentinc/cp-kafka:7.8.0");
+    }
+
+    /**
+     * Брокер очередей для рассылки. Образ с плагином управления — тот же, что в compose:
+     * тестам интерфейс не нужен, но держать два разных образа одной версии незачем.
+     */
+    @Bean
+    @ServiceConnection
+    RabbitMQContainer rabbitContainer() {
+        return new RabbitMQContainer("rabbitmq:4.1.4-management");
     }
 
     @Bean

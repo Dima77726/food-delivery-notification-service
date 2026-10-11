@@ -17,10 +17,10 @@ spring:
     username: ${NOTIFICATION_DB_USER}
     password: ${NOTIFICATION_DB_PASSWORD}
     hikari:
-      # Сервису нужно немного соединений: HTTP-нагрузки почти нет, потребитель Kafka
-      # и планировщик рассылки держат по одному.
-      maximum-pool-size: ${DB_POOL_SIZE:5}
-      minimum-idle: ${DB_POOL_SIZE:5}
+      # Сервису нужно немного соединений: HTTP-нагрузки почти нет, соединения держат
+      # потребитель Kafka и обработчики очередей RabbitMQ — по одному на каждого.
+      maximum-pool-size: ${DB_POOL_SIZE:8}
+      minimum-idle: ${DB_POOL_SIZE:8}
       connection-timeout: 3000
       leak-detection-threshold: 20000
 
@@ -50,10 +50,38 @@ spring:
     listener:
       ack-mode: record
 
+  rabbitmq:
+    # По умолчанию — брокер из docker-compose, опубликованный на хост. Учётных данных
+    # по умолчанию нет, как и у баз: забытая переменная останавливает сервис на старте.
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASSWORD}
+    # Публикация ждёт подтверждения брокера: «отправлено» должно значить «брокер записал».
+    publisher-confirm-type: simple
+    listener:
+      simple:
+        # Отказ обработчика уводит сообщение в dead-letter exchange (очередь ожидания),
+        # а не обратно в голову той же очереди — иначе сбойное сообщение крутилось бы
+        # в цикле без паузы.
+        default-requeue-rejected: false
+        # Сколько неподтверждённых сообщений брокер выдаёт одному обработчику. Мало —
+        # обработчик простаивает между сообщениями, много — одно медленное письмо
+        # задерживает пачку за собой, и приоритеты перестают работать.
+        prefetch: ${NOTIFICATION_PREFETCH:5}
+        concurrency: ${NOTIFICATION_CONCURRENCY:1}
+        max-concurrency: ${NOTIFICATION_MAX_CONCURRENCY:4}
+
 app:
   notification:
-    dispatch-interval: ${NOTIFICATION_DISPATCH_INTERVAL:PT30S}
-    dispatch-enabled: ${NOTIFICATION_DISPATCH_ENABLED:true}
+    # Пауза перед повтором — TTL очереди ожидания (см. NotificationTopology).
+    retry-delay: ${NOTIFICATION_RETRY_DELAY:PT10S}
+    # Сколько раз пытаться отправить, прежде чем отложить уведомление в notifications.dead.
+    max-attempts: ${NOTIFICATION_MAX_ATTEMPTS:5}
+    # Страховочный опрос: уведомления в PENDING старше sweep-stale-after получают задачу заново.
+    sweep-interval: ${NOTIFICATION_SWEEP_INTERVAL:PT1M}
+    sweep-stale-after: ${NOTIFICATION_SWEEP_STALE_AFTER:PT5M}
+    sweep-enabled: ${NOTIFICATION_SWEEP_ENABLED:true}
 
   security:
     jwt:

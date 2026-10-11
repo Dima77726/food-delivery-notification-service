@@ -68,6 +68,17 @@
             <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
 
+        <!--
+            RabbitMQ — для рассылки, а не для событий. Kafka приносит факт «заказ оплачен»,
+            а отправка письма — это задача с повторами, задержкой и пределом попыток:
+            ровно то, что брокер очередей умеет сам (TTL, dead-letter exchange, приоритеты,
+            подтверждение каждого сообщения), а лог событий — нет.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
@@ -135,6 +146,12 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-kafka</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-rabbitmq</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
