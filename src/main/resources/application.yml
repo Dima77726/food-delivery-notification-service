@@ -1,0 +1,100 @@
+spring:
+  application:
+    name: notification-service
+
+  lifecycle:
+    # Согласовано с stop_grace_period в docker-compose.yml, см. комментарий в монолите.
+    timeout-per-shutdown-phase: 20s
+
+  datasource:
+    # Своя база, а не схема в базе монолита: database-per-service. Сервис владеет своими
+    # данными целиком, и никто, кроме него, в эту базу не ходит — ни на чтение, ни тем
+    # более на запись. Локально база живёт в том же контейнере PostgreSQL, что и база
+    # монолита, в продакшене — где угодно: код от этого не зависит, меняется только URL.
+    url: jdbc:postgresql://${NOTIFICATION_DB_HOST:localhost}:${NOTIFICATION_DB_PORT:5432}/${NOTIFICATION_DB_NAME:notification}
+    # Своя учётная запись, у которой нет прав на чужие базы. Общий пользователь на все
+    # сервисы превратил бы изоляцию данных в соглашение, которое держится на честном слове.
+    username: ${NOTIFICATION_DB_USER}
+    password: ${NOTIFICATION_DB_PASSWORD}
+    hikari:
+      # Сервису нужно немного соединений: HTTP-нагрузки почти нет, потребитель Kafka
+      # и планировщик рассылки держат по одному.
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      minimum-idle: ${DB_POOL_SIZE:5}
+      connection-timeout: 3000
+      leak-detection-threshold: 20000
+
+  liquibase:
+    change-log: classpath:/db/changelog/changelog.yml
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+
+    producer:
+      # Продюсер нужен только для отправки в DLT, но и там потеря сообщения недопустима.
+      acks: all
+      properties:
+        enable.idempotence: true
+
+    consumer:
+      # Та же группа, что была у потребителя в монолите, — см. OrderEventsConsumer.
+      group-id: ${KAFKA_CONSUMER_GROUP:food-delivery-notifications}
+      auto-offset-reset: earliest
+      properties:
+        max.poll.records: 50
+        # Потребитель не должен создавать чужой топик. Иначе, стартуй сервис раньше
+        # монолита, брокер создал бы food-delivery.order-events с настройками по умолчанию —
+        # одной партицией вместо трёх, — и исправлять это пришлось бы пересозданием топика.
+        allow.auto.create.topics: false
+
+    listener:
+      ack-mode: record
+
+app:
+  notification:
+    dispatch-interval: ${NOTIFICATION_DISPATCH_INTERVAL:PT30S}
+    dispatch-enabled: ${NOTIFICATION_DISPATCH_ENABLED:true}
+
+  security:
+    jwt:
+      # Тот же секрет, которым монолит подписывает токены. Значения по умолчанию нет.
+      secret: ${JWT_SECRET}
+      issuer: ${JWT_ISSUER:food-delivery-platform}
+
+management:
+  server:
+    # Порты по умолчанию рассчитаны на запуск всех сервисов из IDE рядом друг с другом.
+    # В docker-compose каждый сервис живёт в своём контейнере и слушает 8080/8081.
+    port: ${MANAGEMENT_PORT:9083}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+server:
+  port: ${SERVER_PORT:8083}
+  shutdown: graceful
+
+logging:
+  pattern:
+    correlation: "[${spring.application.name:},%X{correlationId:-},%X{userId:-}] "
+  level:
+    root: INFO
+    com.dima.fooddelivery: DEBUG
