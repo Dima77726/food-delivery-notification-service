@@ -10,18 +10,15 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-
 /**
- * Сервис — resource server: принимает токены, выпущенные монолитом, и проверяет их сам.
+ * Сервис — resource server: принимает токены, выпущенные identity-service, и проверяет их сам.
  *
  * <p><b>Почему проверка здесь, а не только в шлюзе.</b> Шлюз — не единственная дорога
  * к сервису: внутри сети до него может достучаться кто угодно, от соседнего контейнера
@@ -29,10 +26,9 @@ import java.nio.charset.StandardCharsets;
  * держится ровно до первой такой дыры. Каждый сервис проверяет подпись сам — это
  * дешевле одного инцидента.
  *
- * <p><b>Почему HS256 — временно.</b> Симметричный ключ означает, что любой, кто умеет
- * проверять токен, умеет его и выпускать: секрет один. Пока сервисов два и оба свои, это
- * терпимо. Следующий шаг — вынести выпуск токенов в identity-service с RS256: он подписывает
- * закрытым ключом, остальные проверяют открытым через JWKS и подделать токен не могут.
+ * <p><b>RS256 и JWKS.</b> Токены подписывает identity-service закрытым ключом, здесь они
+ * проверяются открытым из его JWKS. Секрета, которым можно подписать поддельный токен,
+ * у сервиса нет вовсе.
  *
  * <p>Издатель проверяется явно. Валидатор по умолчанию смотрит только срок жизни, и токен,
  * подписанный тем же ключом, но выпущенный для другой системы, прошёл бы.
@@ -41,9 +37,6 @@ import java.nio.charset.StandardCharsets;
 @EnableConfigurationProperties(JwtProperties.class)
 @RequiredArgsConstructor
 public class SecurityConfig {
-
-    /** HS256 требует ключ не короче 256 бит. */
-    static final int MIN_SECRET_LENGTH_BYTES = 32;
 
     private static final String[] PUBLIC_PATHS = {
             "/v3/api-docs/**",
@@ -86,33 +79,19 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Проверка подписи по JWKS сервиса пользователей и издателя. JWKS скачивается лениво,
+     * при первом токене, и перечитывается на незнакомый {@code kid} — смена ключа
+     * не требует перезапуска. Принимается только RS256.
+     */
     @Bean
     JwtDecoder jwtDecoder() {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKey())
-                .macAlgorithm(MacAlgorithm.HS256)
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwtProperties.jwkSetUri())
+                .jwsAlgorithm(SignatureAlgorithm.RS256)
                 .build();
 
         decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(jwtProperties.issuer()));
 
         return decoder;
-    }
-
-    /**
-     * Проверка ключа на месте, а не на {@code ApplicationReadyEvent}: пустой секрет ломает
-     * {@code SecretKeySpec} раньше, с сообщением «Empty key», по которому не догадаться,
-     * что дело в переменной окружения.
-     */
-    private SecretKeySpec secretKey() {
-        String secret = jwtProperties.secret();
-
-        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_LENGTH_BYTES) {
-            throw new IllegalStateException(
-                    "JWT_SECRET должен быть задан и быть не короче " + MIN_SECRET_LENGTH_BYTES
-                            + " байт: этого требует HS256. Значение обязано совпадать с тем, "
-                            + "которым монолит подписывает токены"
-            );
-        }
-
-        return new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
 }
