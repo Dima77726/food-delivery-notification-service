@@ -1,0 +1,4 @@
+databaseChangeLog:
+  - include:
+      file: migrations/001-create-notification.yml
+      relativeToChangelogFile: true
