@@ -4,8 +4,8 @@ import com.dima.fooddelivery.contracts.order.OrderEventTopics;
 import com.dima.fooddelivery.notification.config.KafkaConfig;
 import com.dima.fooddelivery.notification.domain.Notification;
 import com.dima.fooddelivery.notification.service.NotificationService;
+import com.dima.fooddelivery.notification.support.TestJwt;
 import com.dima.fooddelivery.notification.support.TestcontainersConfiguration;
-import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -13,17 +13,11 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.JwsHeader;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 
@@ -86,8 +80,8 @@ class OrderEventsToNotificationIT {
     @Autowired
     private ConfluentKafkaContainer kafkaContainer;
 
-    @Value("${app.security.jwt.secret}")
-    private String jwtSecret;
+    @Autowired
+    private TestJwt jwt;
 
     @Test
     void shouldCreateNotificationFromOrderEvent() {
@@ -182,7 +176,7 @@ class OrderEventsToNotificationIT {
     }
 
     /**
-     * Токен выпущен монолитом, а проверяется здесь — это и есть проверка того, что
+     * Токен в форме identity-service, проверяется здесь — это и есть проверка того, что
      * у сервисов общий контракт токена.
      */
     @Test
@@ -246,21 +240,7 @@ class OrderEventsToNotificationIT {
     }
 
     private String token(long userId, String issuer) {
-        NimbusJwtEncoder encoder = new NimbusJwtEncoder(
-                new ImmutableSecret<>(jwtSecret.getBytes(StandardCharsets.UTF_8))
-        );
-
-        Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .issuer(issuer)
-                .issuedAt(now)
-                .expiresAt(now.plus(Duration.ofMinutes(5)))
-                .subject(String.valueOf(userId))
-                .claim("roles", List.of("CUSTOMER"))
-                .build();
-
-        return encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
-                .getTokenValue();
+        return jwt.tokenWithIssuer(userId, issuer, "CUSTOMER");
     }
 
     private KafkaConsumer<String, String> createConsumer() {

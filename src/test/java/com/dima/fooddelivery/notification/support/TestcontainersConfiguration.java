@@ -5,7 +5,9 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
@@ -29,6 +31,22 @@ public class TestcontainersConfiguration {
     @ServiceConnection
     ConfluentKafkaContainer kafkaContainer() {
         return new ConfluentKafkaContainer("confluentinc/cp-kafka:7.8.0");
+    }
+
+    @Bean
+    TestJwt testJwt() {
+        return new TestJwt();
+    }
+
+    /**
+     * Декодер с открытым ключом {@link TestJwt} вместо JWKS сервиса пользователей — его в тестах
+     * нет. {@code @Primary}: настоящий декодер в контексте тоже есть, но JWKS он скачивает лениво
+     * и до первого токена никуда не ходит.
+     */
+    @Bean
+    @Primary
+    JwtDecoder testJwtDecoder() {
+        return TestJwt.decoder();
     }
 
     /**

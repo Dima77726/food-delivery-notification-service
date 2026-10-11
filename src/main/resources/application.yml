@@ -57,9 +57,9 @@ app:
 
   security:
     jwt:
-      # Тот же секрет, которым монолит подписывает токены. Значения по умолчанию нет.
-      secret: ${JWT_SECRET}
+      # Открытые ключи сервиса пользователей. Секрета подписи у сервиса нет.
       issuer: ${JWT_ISSUER:food-delivery-platform}
+      jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8085/.well-known/jwks.json}
 
 management:
   server:
