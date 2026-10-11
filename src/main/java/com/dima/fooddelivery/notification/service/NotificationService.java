@@ -2,36 +2,36 @@ package com.dima.fooddelivery.notification.service;
 
 import com.dima.fooddelivery.notification.domain.Notification;
 import com.dima.fooddelivery.notification.domain.NotificationChannel;
+import com.dima.fooddelivery.notification.domain.NotificationEnqueued;
 import com.dima.fooddelivery.notification.persistence.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
  * Модуль Notification.
  *
- * <p>Уведомление сначала кладётся в таблицу со статусом PENDING в той же транзакции, что и
- * бизнес-операция, и только потом отправляется отдельным шагом. Это паттерн outbox, и он решает
- * конкретную проблему: если отправлять письмо прямо в транзакции, то при её откате письмо
- * уже улетело, а заказа нет. Обратный порядок — отправка после коммита без записи в базу —
- * теряет уведомления при падении процесса.
+ * <p>Уведомление сначала записывается в таблицу со статусом PENDING — база здесь источник
+ * правды о том, что отправить. Сразу после коммита задача уходит в RabbitMQ, в очередь своего
+ * канала, и обработчик ({@code NotificationWorker}) отправляет её, повторяя при сбоях. Если
+ * задача потерялась по дороге, страховочный опрос ({@code NotificationSweeper}) найдёт
+ * зависшее уведомление в базе и поставит задачу заново.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
 
-    /**
-     * Размер пачки. Чем он больше, тем дольше держатся блокировки строк, поэтому не сотни.
-     */
-    private static final int SEND_BATCH_SIZE = 50;
-
     private final NotificationRepository notificationRepository;
     private final NotificationSender notificationSender;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Постановка уведомления по событию из Kafka.
@@ -50,9 +50,14 @@ public class NotificationService {
             Long orderId,
             String correlationId
     ) {
-        return notificationRepository.insert(
+        Long notificationId = notificationRepository.insert(
                 eventId, recipientId, channel, type, subject, body, orderId, correlationId
         );
+
+        // Задача в RabbitMQ уходит после коммита — см. NotificationTaskPublisher.
+        eventPublisher.publishEvent(new NotificationEnqueued(notificationId, channel, type, correlationId));
+
+        return notificationId;
     }
 
     @Transactional
@@ -66,59 +71,56 @@ public class NotificationService {
     ) {
         Long notificationId = notificationRepository.insert(recipientId, channel, type, subject, body, orderId);
 
+        eventPublisher.publishEvent(new NotificationEnqueued(notificationId, channel, type, null));
+
         log.debug("Уведомление поставлено в очередь: notificationId={}, type={}", notificationId, type);
 
         return notificationId;
     }
 
     /**
-     * Отправляет накопившиеся уведомления.
+     * Отправляет одно уведомление.
      *
-     * <p>Вся пачка обрабатывается в одной транзакции, и это обязательное условие: блокировка
-     * из {@code FOR UPDATE SKIP LOCKED} живёт ровно до её конца. Отпусти транзакцию раньше —
-     * и соседний экземпляр приложения подхватит те же строки.
+     * <p>Строка блокируется на время отправки ({@code FOR UPDATE SKIP LOCKED}): если ту же
+     * задачу одновременно взял другой обработчик — например, повтор от страховочного опроса, —
+     * он строку не получит и ничего не сделает. Отправленное раньше уведомление тоже не найдётся:
+     * выборка берёт только PENDING. Так повтор задачи никогда не превращается в второе письмо.
      *
-     * <p>Падение отправки одного уведомления не откатывает остальные: исключение
-     * перехватывается и превращается в статус FAILED, то есть транзакция остаётся успешной.
+     * <p>Сбой отправки — исключение наружу: транзакция откатывается, блокировка снимается,
+     * а что делать дальше — повторить позже или сдаться, — решает обработчик очереди.
      *
-     * <p>Ограничение, которое надо знать: транзакция держится открытой всё время отправки.
-     * С записью в лог это доли миллисекунды, с реальным SMTP — секунды на каждое письмо,
-     * и такую транзакцию держать нельзя. Правильное решение для настоящего отправителя —
-     * разделить на два шага: короткая транзакция помечает пачку как взятую в работу
-     * (нужен отдельный статус PROCESSING), отправка идёт уже вне транзакции. Пока
-     * отправитель пишет в лог, усложнять незачем.
+     * <p>Транзакция держится открытой, пока идёт отправка. С записью в лог это доли
+     * миллисекунды; с настоящим SMTP отправку стоит вынести из транзакции, пометив строку
+     * отдельным статусом «в работе».
+     *
+     * @return {@code true}, если уведомление отправлено сейчас; {@code false} — делать нечего
      */
     @Transactional
-    public int dispatchPending() {
-        List<Notification> pending = notificationRepository.lockPending(SEND_BATCH_SIZE);
+    public boolean deliver(Long notificationId) {
+        Optional<Notification> pending = notificationRepository.lockPendingById(notificationId);
 
-        int sent = 0;
-        for (Notification notification : pending) {
-            if (dispatchOne(notification)) {
-                sent++;
-            }
-        }
-
-        return sent;
-    }
-
-    private boolean dispatchOne(Notification notification) {
-        try {
-            notificationSender.send(notification);
-            notificationRepository.markSent(notification.id());
-
-            return true;
-        } catch (RuntimeException exception) {
-            log.warn(
-                    "Не удалось отправить уведомление: notificationId={}, reason={}",
-                    notification.id(),
-                    exception.getMessage()
-            );
-
-            notificationRepository.markFailed(notification.id(), exception.getMessage());
-
+        if (pending.isEmpty()) {
             return false;
         }
+
+        notificationSender.send(pending.get());
+        notificationRepository.markSent(notificationId);
+
+        return true;
+    }
+
+    /** Попытки кончились: уведомление больше не отправляется, причина остаётся в журнале. */
+    @Transactional
+    public void markFailed(Long notificationId, String reason) {
+        String trimmed = reason == null ? null : reason.substring(0, Math.min(reason.length(), 500));
+
+        notificationRepository.markFailed(notificationId, trimmed);
+    }
+
+    /** Уведомления, которые ждут отправки дольше, чем могли бы, — для страховочного опроса. */
+    @Transactional(readOnly = true)
+    public List<Notification> findStalePending(OffsetDateTime createdBefore, int limit) {
+        return notificationRepository.findPendingCreatedBefore(createdBefore, limit);
     }
 
     @Transactional(readOnly = true)

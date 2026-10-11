@@ -53,8 +53,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * в каждом тесте.
  */
 @SpringBootTest(properties = {
-        // Рассылка по таймеру меняла бы статусы уведомлений посреди проверок.
-        "app.notification.dispatch-enabled=false",
+        // Страховочный опрос по таймеру ставил бы задачи посреди проверок.
+        "app.notification.sweep-enabled=false",
         "logging.level.org.testcontainers=WARN",
         "logging.level.com.zaxxer.hikari=WARN"
 })
