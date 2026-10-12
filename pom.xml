@@ -4,14 +4,25 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.dima</groupId>
-        <artifactId>food-delivery-platform</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.5</version>
+        <relativePath/>
     </parent>
 
+    <groupId>com.dima</groupId>
+    <version>0.0.1-SNAPSHOT</version>
     <artifactId>notification-service</artifactId>
     <name>notification-service</name>
     <description>Сервис уведомлений: читает события заказа из Kafka и рассылает уведомления</description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- Ветка 3.x springdoc — единственная, совместимая со Spring Boot 4 / Framework 7. -->
+        <springdoc.version>3.1.0</springdoc.version>
+        <!-- Версия контрактов своя, отдельно от версии сервиса: см. food-delivery-contracts. -->
+        <contracts.version>1.0.0</contracts.version>
+    </properties>
 
     <!--
         Первый сервис, вынесенный из монолита. Выбран не случайно: с остальными модулями
@@ -22,6 +33,27 @@
         Зависимостей на монолит нет и быть не может: общее у них — контракт события
         из libs/event-contracts, и только он.
     -->
+
+    <!--
+        Контракты платформы — в GitHub Packages репозитория food-delivery-contracts. Читать оттуда
+        нужен токен даже для публичных пакетов: см. README контрактов (settings.xml с сервером github).
+    -->
+    <repositories>
+        <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/Dima77726/food-delivery-contracts</url>
+        </repository>
+    </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.dima</groupId>
+                <artifactId>event-contracts</artifactId>
+                <version>${contracts.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
