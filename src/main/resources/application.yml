@@ -30,6 +30,11 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
 
+    template:
+      # Отправка и получение сообщений становятся спанами, а traceparent едет заголовком
+      # сообщения: трассу можно проследить из одного сервиса в другой через Kafka.
+      observation-enabled: true
+
     producer:
       # Продюсер нужен только для отправки в DLT, но и там потеря сообщения недопустима.
       acks: all
@@ -49,6 +54,7 @@ spring:
 
     listener:
       ack-mode: record
+      observation-enabled: true
 
   rabbitmq:
     # По умолчанию — брокер из docker-compose, опубликованный на хост. Учётных данных
@@ -59,8 +65,11 @@ spring:
     password: ${RABBITMQ_PASSWORD}
     # Публикация ждёт подтверждения брокера: «отправлено» должно значить «брокер записал».
     publisher-confirm-type: simple
+    template:
+      observation-enabled: true
     listener:
       simple:
+        observation-enabled: true
         # Отказ обработчика уводит сообщение в dead-letter exchange (очередь ожидания),
         # а не обратно в голову той же очереди — иначе сбойное сообщение крутилось бы
         # в цикле без паузы.
@@ -90,6 +99,30 @@ app:
       jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8085/.well-known/jwks.json}
 
 management:
+  # Трассировка. Спаны собирает Micrometer Tracing поверх OpenTelemetry и отправляет по OTLP
+  # в Tempo. Сквозной идентификатор trace живёт рядом с X-Correlation-Id, а не вместо него:
+  # метка запроса — наша, она едет и через то, что трассировка не покрывает (outbox, очереди).
+  tracing:
+    sampling:
+      # В локальном стеке — все запросы. В боевом этого слишком много: 0.1 и ниже.
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
+          transport: http
+  otlp:
+    tracing:
+      export:
+        # Выключено по умолчанию: запуск из IDE и тесты не должны сыпать в лог ошибками
+        # о недоступном Tempo. Docker Compose включает через TRACING_EXPORT_ENABLED=true.
+        enabled: ${TRACING_EXPORT_ENABLED:false}
+    metrics:
+      export:
+        # Метрики по-прежнему снимает Prometheus; стартер тянет OTLP-реестр метрик,
+        # и без этой строки он слал бы то же самое второй раз.
+        enabled: false
   server:
     # Порты по умолчанию рассчитаны на запуск всех сервисов из IDE рядом друг с другом.
     # В docker-compose каждый сервис живёт в своём контейнере и слушает 8080/8081.
@@ -122,7 +155,7 @@ server:
 
 logging:
   pattern:
-    correlation: "[${spring.application.name:},%X{correlationId:-},%X{userId:-}] "
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},%X{correlationId:-},%X{userId:-}] "
   level:
     root: INFO
     com.dima.fooddelivery: DEBUG
