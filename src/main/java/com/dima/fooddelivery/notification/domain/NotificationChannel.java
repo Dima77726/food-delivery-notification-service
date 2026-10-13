@@ -2,7 +2,7 @@ package com.dima.fooddelivery.notification.domain;
 
 public enum NotificationChannel {
 
-    EMAIL, SMS, PUSH;
+    EMAIL, SMS, PUSH, TELEGRAM;
 
     public static NotificationChannel fromDbValue(String dbValue) {
         for (NotificationChannel channel : values()) {

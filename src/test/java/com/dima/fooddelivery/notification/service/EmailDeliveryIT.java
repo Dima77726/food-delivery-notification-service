@@ -56,9 +56,7 @@ class EmailDeliveryIT {
 
         UserDirectoryClient directory = userId ->
                 Optional.of(new UserContactInfo(userId, "anna@example.test", "Анна", true));
-        EmailNotificationSender sender = new EmailNotificationSender(
-                directory, mailSender, new LoggingNotificationSender(), "no-reply@food-delivery.local"
-        );
+        EmailNotificationSender sender = new EmailNotificationSender(directory, mailSender, "no-reply@food-delivery.local");
 
         sender.send(new Notification(
                 1L, 7L, NotificationChannel.EMAIL, "ORDER_ACCEPTED",

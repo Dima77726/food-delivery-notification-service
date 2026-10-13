@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-telegram
+      author: dima
+      changes:
+        - sqlFile:
+            path: sql/002-telegram.sql
+            relativeToChangelogFile: true
+            splitStatements: true

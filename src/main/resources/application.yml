@@ -117,6 +117,17 @@ app:
       # Включённая почта ходит за адресом в identity-service и по SMTP — см. EmailNotificationSender.
       enabled: ${EMAIL_ENABLED:false}
       from: ${EMAIL_FROM:no-reply@food-delivery.local}
+
+    telegram:
+      # Выключено по умолчанию: без токена бота канал не запускается. Включённый создаёт клиент
+      # Bot API, опрос бота и ручки привязки /api/v1/notifications/telegram.
+      enabled: ${TELEGRAM_ENABLED:false}
+      # Токен от @BotFather. Значения по умолчанию нет: по токену можно писать от имени бота кому угодно.
+      bot-token: ${TELEGRAM_BOT_TOKEN:}
+      # Имя бота без @ — из него собирается ссылка привязки t.me/<имя>?start=<код>.
+      bot-username: ${TELEGRAM_BOT_USERNAME:}
+      # Опрос ведёт один экземпляр сервиса; на остальных false (иначе Telegram отвечает 409).
+      polling-enabled: ${TELEGRAM_POLLING_ENABLED:true}
     # Пауза перед повтором — TTL очереди ожидания (см. NotificationTopology).
     retry-delay: ${NOTIFICATION_RETRY_DELAY:PT10S}
     # Сколько раз пытаться отправить, прежде чем отложить уведомление в notifications.dead.

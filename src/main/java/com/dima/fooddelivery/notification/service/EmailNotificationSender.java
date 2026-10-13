@@ -9,7 +9,6 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Primary;
 import org.springframework.mail.MailParseException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -20,9 +19,9 @@ import java.nio.charset.StandardCharsets;
 /**
  * Настоящая доставка по каналу EMAIL: адрес берётся у identity-service, письмо уходит по SMTP.
  *
- * <p>Включается {@code app.notification.email.enabled=true}; без него по-прежнему работает
- * отправка «в лог» ({@link LoggingNotificationSender}). SMS и PUSH остаются в логе при любых
- * настройках: у них нет шлюза.
+ * <p>Включается {@code app.notification.email.enabled=true}; без него канал EMAIL по-прежнему
+ * уходит «в лог» ({@link LoggingNotificationSender}) — выбор делает {@link RoutingNotificationSender}.
+ * SMS и PUSH остаются в логе при любых настройках: у них нет шлюза.
  *
  * <p><b>Адрес не хранится здесь.</b> Событие заказа его не содержит (его читают многие
  * потребители, а адрес — персональные данные), поэтому контакт спрашивается в момент отправки.
@@ -44,34 +43,30 @@ import java.nio.charset.StandardCharsets;
  */
 @Slf4j
 @Component
-@Primary
 @ConditionalOnProperty(name = "app.notification.email.enabled", havingValue = "true")
-public class EmailNotificationSender implements NotificationService.NotificationSender {
+public class EmailNotificationSender implements ChannelNotificationSender {
 
     private final UserDirectoryClient directory;
     private final JavaMailSender mailSender;
-    private final LoggingNotificationSender fallback;
     private final String from;
 
     public EmailNotificationSender(
             UserDirectoryClient directory,
             JavaMailSender mailSender,
-            LoggingNotificationSender fallback,
             @Value("${app.notification.email.from:no-reply@food-delivery.local}") String from
     ) {
         this.directory = directory;
         this.mailSender = mailSender;
-        this.fallback = fallback;
         this.from = from;
     }
 
     @Override
-    public void send(Notification notification) {
-        if (notification.channel() != NotificationChannel.EMAIL) {
-            fallback.send(notification);
-            return;
-        }
+    public NotificationChannel channel() {
+        return NotificationChannel.EMAIL;
+    }
 
+    @Override
+    public void send(Notification notification) {
         UserContactInfo contact = directory.findContact(notification.recipientId())
                 .orElseThrow(() -> new PermanentDeliveryException(
                         "Получатель не найден: userId=" + notification.recipientId()

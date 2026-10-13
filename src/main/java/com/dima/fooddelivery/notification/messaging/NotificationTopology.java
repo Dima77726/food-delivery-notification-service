@@ -68,6 +68,7 @@ public class NotificationTopology {
     public static final String EMAIL_QUEUE = "notifications.email";
     public static final String SMS_QUEUE = "notifications.sms";
     public static final String PUSH_QUEUE = "notifications.push";
+    public static final String TELEGRAM_QUEUE = "notifications.telegram";
 
     /** Верхняя граница приоритета. Больше десяти брокеру держать дорого и незачем. */
     static final int MAX_PRIORITY = 10;
