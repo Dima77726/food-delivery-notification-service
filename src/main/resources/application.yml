@@ -56,6 +56,31 @@ spring:
       ack-mode: record
       observation-enabled: true
 
+  mail:
+    # Mailpit из docker-compose (SMTP на 1025) — локальный приёмник писем, наружу ничего не уходит.
+    # Настоящий SMTP-провайдер подключается теми же свойствами; логин и пароль — только из окружения.
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USER:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_STARTTLS:false}
+      # Таймауты обязательны: по умолчанию их нет, и зависший SMTP держал бы поток обработчика
+      # и соединение с базой (отправка стоит внутри транзакции доставки).
+      mail.smtp.connectiontimeout: 3000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
+
+  grpc:
+    client:
+      channels:
+        # Сервис пользователей: адрес почты получателя. По умолчанию — для запуска из IDE,
+        # в docker-compose переопределяется.
+        identity:
+          address: ${IDENTITY_GRPC_ADDRESS:static://localhost:7085}
+          negotiation-type: plaintext
+
   rabbitmq:
     # По умолчанию — брокер из docker-compose, опубликованный на хост. Учётных данных
     # по умолчанию нет, как и у баз: забытая переменная останавливает сервис на старте.
@@ -82,7 +107,16 @@ spring:
         max-concurrency: ${NOTIFICATION_MAX_CONCURRENCY:4}
 
 app:
+  grpc:
+    identity:
+      deadline: ${IDENTITY_GRPC_DEADLINE:PT2S}
+
   notification:
+    email:
+      # Выключено по умолчанию: письма уходят «в лог», как раньше. Docker Compose включает.
+      # Включённая почта ходит за адресом в identity-service и по SMTP — см. EmailNotificationSender.
+      enabled: ${EMAIL_ENABLED:false}
+      from: ${EMAIL_FROM:no-reply@food-delivery.local}
     # Пауза перед повтором — TTL очереди ожидания (см. NotificationTopology).
     retry-delay: ${NOTIFICATION_RETRY_DELAY:PT10S}
     # Сколько раз пытаться отправить, прежде чем отложить уведомление в notifications.dead.
@@ -99,6 +133,11 @@ app:
       jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8085/.well-known/jwks.json}
 
 management:
+  health:
+    mail:
+      # Недоступный SMTP не делает сервис неготовым: письма уйдут на повтор через очередь, а
+      # остальное (список уведомлений, приём событий) продолжает работать.
+      enabled: false
   # Трассировка. Спаны собирает Micrometer Tracing поверх OpenTelemetry и отправляет по OTLP
   # в Tempo. Сквозной идентификатор trace живёт рядом с X-Correlation-Id, а не вместо него:
   # метка запроса — наша, она едет и через то, что трассировка не покрывает (outbox, очереди).
