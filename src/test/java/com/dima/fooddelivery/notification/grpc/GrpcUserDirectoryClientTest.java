@@ -17,8 +17,10 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -80,6 +82,22 @@ class GrpcUserDirectoryClientTest {
         assertTrue(Duration.ofNanos(System.nanoTime() - started).toMillis() < 2_000, "ожидание обязано оборваться по дедлайну");
     }
 
+    /** Прогрев делает ровно один пробный вызов и не ломается, даже если сосед отвечает ошибкой. */
+    @Test
+    void shouldWarmUpChannelWithOneProbeCallAndSwallowFailures() throws Exception {
+        FakeDirectory directory = new FakeDirectory(Status.UNAVAILABLE, false);
+        GrpcUserDirectoryClient client = (GrpcUserDirectoryClient) clientFor(directory);
+
+        assertDoesNotThrow(client::warmUpAfterStartup);
+
+        long until = System.currentTimeMillis() + 3_000;
+        while (directory.calls.get() == 0 && System.currentTimeMillis() < until) {
+            Thread.sleep(20);
+        }
+
+        assertEquals(1, directory.calls.get());
+    }
+
     private UserDirectoryClient clientFor(FakeDirectory directory) throws IOException {
         return clientFor(directory, Duration.ofSeconds(2));
     }
@@ -98,6 +116,7 @@ class GrpcUserDirectoryClientTest {
 
     private static class FakeDirectory extends UserDirectoryServiceGrpc.UserDirectoryServiceImplBase {
 
+        final AtomicInteger calls = new AtomicInteger();
         private final Status failure;
         private final boolean hang;
 
@@ -108,6 +127,8 @@ class GrpcUserDirectoryClientTest {
 
         @Override
         public void getUserContact(GetUserContactRequest request, StreamObserver<UserContact> observer) {
+            calls.incrementAndGet();
+
             if (hang) {
                 return;
             }
