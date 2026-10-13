@@ -13,9 +13,8 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-public class LoggingNotificationSender implements NotificationService.NotificationSender {
+public class LoggingNotificationSender {
 
-    @Override
     public void send(Notification notification) {
         log.info(
                 "[{}] Уведомление пользователю {}: {} | {}",

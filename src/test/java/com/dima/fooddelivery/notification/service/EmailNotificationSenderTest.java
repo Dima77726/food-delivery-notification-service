@@ -37,10 +37,9 @@ class EmailNotificationSenderTest {
 
     private final UserDirectoryClient directory = mock(UserDirectoryClient.class);
     private final JavaMailSender mailSender = mock(JavaMailSender.class);
-    private final LoggingNotificationSender fallback = mock(LoggingNotificationSender.class);
 
     private final EmailNotificationSender sender =
-            new EmailNotificationSender(directory, mailSender, fallback, "no-reply@food-delivery.local");
+            new EmailNotificationSender(directory, mailSender, "no-reply@food-delivery.local");
 
     @Test
     void shouldSendRussianMailToAddressFromDirectory() throws Exception {
@@ -122,18 +121,6 @@ class EmailNotificationSenderTest {
         RuntimeException error = assertThrows(MailSendException.class, () -> sender.send(email(7L, "Тема", "Текст")));
 
         assertTrue(!(error instanceof PermanentDeliveryException));
-    }
-
-    /** У SMS и PUSH шлюза нет: они остаются в логе, и в директорию за адресом не ходят. */
-    @Test
-    void shouldLeaveOtherChannelsToTheLog() {
-        Notification sms = notification(7L, NotificationChannel.SMS, "Тема", "Текст");
-
-        sender.send(sms);
-
-        verify(fallback).send(sms);
-        verify(directory, never()).findContact(any());
-        verify(mailSender, never()).send(any(MimeMessage.class));
     }
 
     private static Notification email(Long recipientId, String subject, String body) {

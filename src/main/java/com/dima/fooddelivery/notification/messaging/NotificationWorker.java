@@ -57,7 +57,8 @@ public class NotificationWorker {
     @RabbitListener(queues = {
             NotificationTopology.EMAIL_QUEUE,
             NotificationTopology.SMS_QUEUE,
-            NotificationTopology.PUSH_QUEUE
+            NotificationTopology.PUSH_QUEUE,
+            NotificationTopology.TELEGRAM_QUEUE
     })
     public void onTask(Message message) {
         String correlationId = message.getMessageProperties().getHeader(RequestContext.CORRELATION_ID_HEADER);

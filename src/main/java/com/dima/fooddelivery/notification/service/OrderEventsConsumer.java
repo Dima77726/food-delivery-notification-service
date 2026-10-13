@@ -3,11 +3,13 @@ package com.dima.fooddelivery.notification.service;
 import com.dima.fooddelivery.contracts.order.OrderEventTopics;
 import com.dima.fooddelivery.contracts.order.OrderIntegrationEvent;
 import com.dima.fooddelivery.notification.domain.NotificationChannel;
+import com.dima.fooddelivery.notification.telegram.TelegramLinkService;
 import com.dima.fooddelivery.notification.web.RequestContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
+import org.springframework.beans.factory.ObjectProvider;
 import org.slf4j.MDC;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -56,6 +58,9 @@ public class OrderEventsConsumer {
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
+    /** Пуст, пока канал Telegram выключен: тогда события обрабатываются как раньше. */
+    private final ObjectProvider<TelegramLinkService> telegramLinks;
+
     @KafkaListener(
             topics = OrderEventTopics.ORDER_EVENTS,
             groupId = "${spring.kafka.consumer.group-id}"
@@ -87,11 +92,28 @@ public class OrderEventsConsumer {
             return;
         }
 
+        enqueue(event, NotificationChannel.EMAIL, message, correlationId);
+
+        // Telegram — только тем, кто его подключил: остальным писать некуда, а «неудачное»
+        // уведомление на каждый заказ засоряло бы журнал и очередь.
+        TelegramLinkService telegram = telegramLinks.getIfAvailable();
+
+        if (telegram != null && telegram.isLinked(event.customerId())) {
+            enqueue(event, NotificationChannel.TELEGRAM, message, correlationId);
+        }
+    }
+
+    /**
+     * Уведомление одного канала. Каналы независимы: повтор события не должен ни дублировать
+     * доставленное по одному каналу, ни мешать поставить недостающее по другому — идемпотентность
+     * держит пара «событие + канал».
+     */
+    private void enqueue(OrderIntegrationEvent event, NotificationChannel channel, String message, String correlationId) {
         try {
             notificationService.enqueueFromEvent(
                     event.eventId(),
                     event.customerId(),
-                    NotificationChannel.EMAIL,
+                    channel,
                     event.eventType(),
                     "Заказ №" + event.orderId(),
                     message,
@@ -102,7 +124,7 @@ public class OrderEventsConsumer {
             // Повторная доставка того же события. Штатный исход при гарантии «хотя бы один
             // раз», а не ошибка: бросить исключение здесь означало бы отправить сообщение
             // в DLT и заставить человека разбираться с нормальным поведением системы.
-            log.debug("Событие уже обработано, пропускаем: eventId={}", event.eventId());
+            log.debug("Событие уже обработано, пропускаем: eventId={}, channel={}", event.eventId(), channel);
         }
     }
 
