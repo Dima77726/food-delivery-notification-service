@@ -40,7 +40,7 @@ public class HttpTelegramClient implements TelegramClient {
     private final ObjectMapper objectMapper;
     private final String token;
 
-    public HttpTelegramClient(TelegramProperties properties, ObjectMapper objectMapper, RestClient.Builder builder) {
+    public HttpTelegramClient(TelegramProperties properties, ObjectMapper objectMapper) {
         if (properties.botToken() == null || properties.botToken().isBlank()) {
             throw new IllegalStateException(
                     "app.notification.telegram.enabled=true, но токен бота не задан: укажите TELEGRAM_BOT_TOKEN"
@@ -60,7 +60,9 @@ public class HttpTelegramClient implements TelegramClient {
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(read);
 
-        this.client = builder
+        // Свой билдер, а не внедрённый: автонастроенного RestClient.Builder в сервисе нет (в Spring Boot 4
+        // он живёт в отдельном стартере), а нам нужен как раз чистый — без наблюдаемости, см. ниже.
+        this.client = RestClient.builder()
                 .baseUrl(properties.apiBaseUrl())
                 .requestFactory(requestFactory)
                 // Без спанов и метрик клиента: в них попал бы адрес с токеном.

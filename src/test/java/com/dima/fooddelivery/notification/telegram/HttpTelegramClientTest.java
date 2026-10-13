@@ -3,7 +3,6 @@ package com.dima.fooddelivery.notification.telegram;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -172,7 +171,7 @@ class HttpTelegramClientTest {
         );
 
         assertThrows(IllegalStateException.class,
-                () -> new HttpTelegramClient(properties, objectMapper, RestClient.builder()));
+                () -> new HttpTelegramClient(properties, objectMapper));
     }
 
     private HttpTelegramClient client() throws IOException {
@@ -203,7 +202,7 @@ class HttpTelegramClientTest {
                 Duration.ofSeconds(1), Duration.ofMinutes(15), Duration.ofSeconds(2), Duration.ofSeconds(5)
         );
 
-        return new HttpTelegramClient(properties, objectMapper, RestClient.builder());
+        return new HttpTelegramClient(properties, objectMapper);
     }
 
     private record Reply(int status, String body) {
