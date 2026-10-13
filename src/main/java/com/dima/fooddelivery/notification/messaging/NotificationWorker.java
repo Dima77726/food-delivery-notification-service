@@ -1,6 +1,7 @@
 package com.dima.fooddelivery.notification.messaging;
 
 import com.dima.fooddelivery.notification.service.NotificationService;
+import com.dima.fooddelivery.notification.service.PermanentDeliveryException;
 import com.dima.fooddelivery.notification.web.RequestContext;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -23,6 +24,9 @@ import java.util.Map;
  *   <li><b>отправлено</b> — подтверждение (ack), уведомление в статусе SENT;</li>
  *   <li><b>нечего делать</b> — уведомление уже отправлено или его прямо сейчас отправляет
  *       другой обработчик (повтор задачи от страховочного опроса). Тоже подтверждение;</li>
+ *   <li><b>доставить нельзя вообще</b> ({@link PermanentDeliveryException}: получателя нет, он
+ *       заблокирован, адреса нет) — уведомление сразу в статусе FAILED с причиной, задача
+ *       подтверждается; повторять нечего;</li>
  *   <li><b>сбой, попытки ещё есть</b> — отказ без возврата в очередь: брокер переложит
  *       сообщение в очередь ожидания, а через её TTL вернёт сюда;</li>
  *   <li><b>сбой, попыток больше нет</b> — уведомление в статусе FAILED с причиной, копия
@@ -78,6 +82,13 @@ public class NotificationWorker {
             if (notificationService.deliver(notificationId)) {
                 log.debug("Уведомление отправлено: notificationId={}, attempt={}", notificationId, attempt);
             }
+        } catch (PermanentDeliveryException exception) {
+            // Повтор ничего не изменит: пять попыток с паузами только держали бы очередь.
+            // Транзакция доставки уже откатилась, блокировка строки снята; пометка — отдельной.
+            notificationService.markFailed(notificationId, exception.getMessage());
+
+            log.warn("Уведомление не может быть доставлено, повтор не нужен: notificationId={}, reason={}",
+                    notificationId, exception.getMessage());
         } catch (RuntimeException exception) {
             if (attempt >= maxAttempts) {
                 notificationService.markFailed(notificationId, exception.getMessage());

@@ -1,0 +1,21 @@
+# Профиль grpc-tls: взаимный TLS на исходящем канале к сервису пользователей.
+# Сервер gRPC у этого сервиса нет, поэтому только клиентская половина: свой сертификат
+# (CN=notification-service) и CA, которому верить. Identity-service пускает по имени из CN.
+# Включается в docker-compose; при запуске из IDE выключен.
+spring:
+  ssl:
+    bundle:
+      pem:
+        grpc:
+          keystore:
+            certificate: ${GRPC_TLS_CERTIFICATE}
+            private-key: ${GRPC_TLS_PRIVATE_KEY}
+          truststore:
+            certificate: ${GRPC_TLS_CA}
+  grpc:
+    client:
+      channels:
+        identity:
+          negotiation-type: tls
+          ssl:
+            bundle: grpc

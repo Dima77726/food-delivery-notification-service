@@ -21,7 +21,10 @@
         <!-- Ветка 3.x springdoc — единственная, совместимая со Spring Boot 4 / Framework 7. -->
         <springdoc.version>3.1.0</springdoc.version>
         <!-- Версия контрактов своя, отдельно от версии сервиса: см. food-delivery-contracts. -->
-        <contracts.version>1.0.0</contracts.version>
+        <contracts.version>1.1.0</contracts.version>
+        <spring-grpc.version>1.0.3</spring-grpc.version>
+        <protobuf-java.version>4.33.4</protobuf-java.version>
+        <resilience4j.version>2.3.0</resilience4j.version>
     </properties>
 
     <!--
@@ -52,6 +55,33 @@
                 <artifactId>event-contracts</artifactId>
                 <version>${contracts.version}</version>
             </dependency>
+            <dependency>
+                <groupId>com.dima</groupId>
+                <artifactId>grpc-contracts</artifactId>
+                <version>${contracts.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.protobuf</groupId>
+                <artifactId>protobuf-java</artifactId>
+                <version>${protobuf-java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.grpc</groupId>
+                <artifactId>spring-grpc-dependencies</artifactId>
+                <version>${spring-grpc.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-circuitbreaker</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.resilience4j</groupId>
+                <artifactId>resilience4j-micrometer</artifactId>
+                <version>${resilience4j.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -59,6 +89,33 @@
         <dependency>
             <groupId>com.dima</groupId>
             <artifactId>event-contracts</artifactId>
+        </dependency>
+
+        <!-- Контакт пользователя спрашиваем у identity-service: адрес почты принадлежит ему. -->
+        <dependency>
+            <groupId>com.dima</groupId>
+            <artifactId>grpc-contracts</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.grpc</groupId>
+            <artifactId>spring-grpc-client-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- Предохранитель на исходящих gRPC-вызовах; см. CircuitBreakerClientInterceptor. -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-micrometer</artifactId>
+        </dependency>
+
+        <!-- Отправка почты по SMTP (JavaMailSender). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
         <dependency>
@@ -152,6 +209,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Сервер gRPC в памяти процесса: клиент каталога пользователей проверяется без сети. -->
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-inprocess</artifactId>
             <scope>test</scope>
         </dependency>
 
