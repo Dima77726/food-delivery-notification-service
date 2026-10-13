@@ -9,6 +9,8 @@ import io.grpc.StatusRuntimeException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.grpc.client.GrpcChannelFactory;
 import org.springframework.stereotype.Component;
 
@@ -31,6 +33,9 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class GrpcUserDirectoryClient implements UserDirectoryClient {
 
+    /** Прогрев вне цепочки доставки, поэтому ждать можно намного дольше рабочего дедлайна. */
+    private static final Duration WARMUP_DEADLINE = Duration.ofSeconds(15);
+
     private final UserDirectoryServiceGrpc.UserDirectoryServiceBlockingStub stub;
     private final Duration deadline;
 
@@ -47,6 +52,29 @@ public class GrpcUserDirectoryClient implements UserDirectoryClient {
     GrpcUserDirectoryClient(Channel channel, Duration deadline) {
         this.stub = UserDirectoryServiceGrpc.newBlockingStub(channel);
         this.deadline = deadline;
+    }
+
+    /**
+     * Прогрев канала после старта.
+     *
+     * <p>Самый первый вызов платит за всё сразу: TLS-рукопожатие по взаимному TLS, HTTP/2, загрузка
+     * классов protobuf и gRPC, холодный JIT. На практике он не укладывался в дедлайн в 2 секунды, и
+     * первое письмо после старта уходило с повтором через очередь. Пробный вызов делается в
+     * отдельном потоке и не задерживает запуск; его результат не важен — важно, что соединение
+     * и классы уже готовы. Если identity-service ещё не поднялся, прогрев молча пропускается, а
+     * канал сам переподключится при первом настоящем вызове.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    void warmUpAfterStartup() {
+        Thread.ofVirtual().name("grpc-identity-warmup").start(() -> {
+            try {
+                // Пользователя 0 нет: NOT_FOUND означает, что весь путь прошёл и сервер ответил.
+                stub.withDeadlineAfter(WARMUP_DEADLINE.toMillis(), TimeUnit.MILLISECONDS)
+                        .getUserContact(GetUserContactRequest.newBuilder().setUserId(0).build());
+            } catch (RuntimeException exception) {
+                log.debug("Прогрев канала к identity-service: {}", exception.getMessage());
+            }
+        });
     }
 
     @Override
