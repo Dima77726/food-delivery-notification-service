@@ -5,3 +5,6 @@ databaseChangeLog:
   - include:
       file: migrations/002-telegram.yml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/003-webhooks.yml
+      relativeToChangelogFile: true
