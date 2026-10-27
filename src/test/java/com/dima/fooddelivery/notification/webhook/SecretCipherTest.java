@@ -32,8 +32,11 @@ class SecretCipherTest {
     void shouldRejectTamperedCiphertext() {
         SecretCipher cipher = new SecretCipher(withKey("MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE="));
         String stored = cipher.encrypt("whsec_abc");
-        char last = stored.charAt(stored.length() - 3);
-        String tampered = stored.substring(0, stored.length() - 3) + (last == 'A' ? 'B' : 'A') + stored.substring(stored.length() - 2);
+        // Портим байт шифротекста, а не символ Base64: замена символа может попасть в биты
+        // выравнивания и не изменить ни одного байта.
+        byte[] bytes = java.util.Base64.getDecoder().decode(stored);
+        bytes[bytes.length / 2] ^= 0x01;
+        String tampered = java.util.Base64.getEncoder().encodeToString(bytes);
 
         assertThrows(IllegalStateException.class, () -> cipher.decrypt(tampered));
     }
