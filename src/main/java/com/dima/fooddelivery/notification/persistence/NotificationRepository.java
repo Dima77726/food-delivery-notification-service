@@ -58,6 +58,27 @@ public class NotificationRepository {
     }
 
     /**
+     * Уведомления получателя новее {@code afterId}, старые первыми, — для долгого запроса,
+     * который продолжает ленту с места, где клиент остановился. Идентификатор растёт с каждой
+     * вставкой, поэтому служит курсором без отдельного поля.
+     */
+    public List<Notification> findByRecipientIdAfter(Long recipientId, long afterId, int limit) {
+        return jdbc.query(
+                SELECT_NOTIFICATION + """
+                         WHERE n.recipient_id = :recipientId
+                           AND n.id > :afterId
+                         ORDER BY n.id
+                         LIMIT :limit
+                        """,
+                new MapSqlParameterSource()
+                        .addValue("recipientId", recipientId)
+                        .addValue("afterId", afterId)
+                        .addValue("limit", limit),
+                NOTIFICATION
+        );
+    }
+
+    /**
      * Неотправленное уведомление, заблокированное за текущей транзакцией.
      *
      * <p>{@code SKIP LOCKED}: если строку уже держит другой обработчик, она просто не находится,

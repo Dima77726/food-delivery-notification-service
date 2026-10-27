@@ -55,7 +55,7 @@ public class NotificationService {
         );
 
         // Задача в RabbitMQ уходит после коммита — см. NotificationTaskPublisher.
-        eventPublisher.publishEvent(new NotificationEnqueued(notificationId, channel, type, correlationId));
+        eventPublisher.publishEvent(new NotificationEnqueued(notificationId, recipientId, channel, type, correlationId));
 
         return notificationId;
     }
@@ -71,7 +71,7 @@ public class NotificationService {
     ) {
         Long notificationId = notificationRepository.insert(recipientId, channel, type, subject, body, orderId);
 
-        eventPublisher.publishEvent(new NotificationEnqueued(notificationId, channel, type, null));
+        eventPublisher.publishEvent(new NotificationEnqueued(notificationId, recipientId, channel, type, null));
 
         log.debug("Уведомление поставлено в очередь: notificationId={}, type={}", notificationId, type);
 
@@ -126,6 +126,11 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public List<Notification> getNotificationsForUser(Long userId) {
         return notificationRepository.findByRecipientId(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Notification> getNotificationsForUserAfter(Long userId, long afterId, int limit) {
+        return notificationRepository.findByRecipientIdAfter(userId, afterId, limit);
     }
 
     /**
