@@ -29,6 +29,9 @@ public class WebhookService {
 
     public Created create(long restaurantId, String url, List<String> eventTypes, String description) {
         long userId = access.requireManager(restaurantId);
+        if (!cipher.isConfigured()) {
+            throw new WebhookErrors.Unavailable("Вебхуки выключены: не задан WEBHOOK_SECRET_KEY");
+        }
         urlGuard.check(url);
 
         List<String> types = List.copyOf(new LinkedHashSet<>(eventTypes));

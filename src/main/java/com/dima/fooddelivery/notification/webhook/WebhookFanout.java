@@ -39,9 +39,13 @@ public class WebhookFanout {
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final SecretCipher cipher;
 
     @KafkaListener(topics = OrderEventTopics.ORDER_EVENTS, groupId = "${app.webhooks.consumer-group:notification-webhooks}")
     public void onOrderEvent(ConsumerRecord<String, String> record) {
+        if (!cipher.isConfigured()) {
+            return;
+        }
         OrderIntegrationEvent event = objectMapper.readValue(record.value(), OrderIntegrationEvent.class);
         if (event.restaurantId() == null || event.newStatus() == null) {
             return;

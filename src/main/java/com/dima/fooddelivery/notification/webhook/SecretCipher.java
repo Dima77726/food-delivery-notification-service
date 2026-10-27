@@ -31,9 +31,16 @@ public class SecretCipher {
 
     private final SecretKeySpec key;
 
+    /**
+     * Без ключа вебхуки выключены, а не весь сервис: уведомления клиентам от них не зависят.
+     * Так новый образ можно выкатить раньше, чем в окружение добавят ключ, — порядок выкатки
+     * сервиса и конфигурации не связан (см. учебник, глава 3, «безопасная выкатка»).
+     * Неверный ключ — другое дело: это ошибка конфигурации, и старт падает.
+     */
     public SecretCipher(WebhookProperties properties) {
         if (properties.secretKey() == null || properties.secretKey().isBlank()) {
-            throw new IllegalStateException("Не задан WEBHOOK_SECRET_KEY: ключ шифрования секретов вебхуков (32 байта в Base64)");
+            this.key = null;
+            return;
         }
         byte[] raw = Base64.getDecoder().decode(properties.secretKey().strip());
         if (raw.length != 32) {
@@ -42,7 +49,12 @@ public class SecretCipher {
         this.key = new SecretKeySpec(raw, "AES");
     }
 
+    public boolean isConfigured() {
+        return key != null;
+    }
+
     public String encrypt(String plain) {
+        requireConfigured();
         try {
             byte[] iv = new byte[IV_BYTES];
             RANDOM.nextBytes(iv);
@@ -56,6 +68,7 @@ public class SecretCipher {
     }
 
     public String decrypt(String stored) {
+        requireConfigured();
         try {
             byte[] all = Base64.getDecoder().decode(stored);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -63,6 +76,12 @@ public class SecretCipher {
             return new String(cipher.doFinal(all, IV_BYTES, all.length - IV_BYTES), StandardCharsets.UTF_8);
         } catch (GeneralSecurityException exception) {
             throw new IllegalStateException("Не удалось расшифровать секрет: другой ключ или повреждённая запись", exception);
+        }
+    }
+
+    private void requireConfigured() {
+        if (key == null) {
+            throw new WebhookErrors.Unavailable("Вебхуки выключены: не задан WEBHOOK_SECRET_KEY");
         }
     }
 }
