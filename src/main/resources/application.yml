@@ -135,6 +135,13 @@ app:
       webhook-public-url: ${TELEGRAM_WEBHOOK_PUBLIC_URL:}
       # Секрет, который Telegram вернёт в заголовке X-Telegram-Bot-Api-Secret-Token. 1–256 символов A-Z a-z 0-9 _ -.
       webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+
+    push:
+      # Web Push (VAPID, RFC 8291). Пара ключей P-256 в Base64url; без неё push выключен (API — 503).
+      # Сгенерировать: docker run --rm node:22-alpine npx -y web-push generate-vapid-keys
+      vapid-public-key: ${WEB_PUSH_VAPID_PUBLIC_KEY:}
+      vapid-private-key: ${WEB_PUSH_VAPID_PRIVATE_KEY:}
+      subject: ${WEB_PUSH_SUBJECT:mailto:admin@food-delivery.local}
     # Пауза перед повтором — TTL очереди ожидания (см. NotificationTopology).
     retry-delay: ${NOTIFICATION_RETRY_DELAY:PT10S}
     # Сколько раз пытаться отправить, прежде чем отложить уведомление в notifications.dead.

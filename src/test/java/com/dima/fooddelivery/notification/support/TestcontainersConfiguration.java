@@ -23,6 +23,8 @@ import org.testcontainers.rabbitmq.RabbitMQContainer;
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
 
+    public static final String[] VAPID = com.dima.fooddelivery.notification.push.WebPushCrypto.newVapidKeys();
+
     /** {@code @Primary}: настоящий gRPC-клиент в контексте есть, но его канал ленивый и никуда не ходит. */
     @Bean
     @Primary
@@ -42,6 +44,9 @@ public class TestcontainersConfiguration {
             registry.add("app.webhooks.retry-delays", () -> "PT0.3S,PT0.6S");
             registry.add("app.webhooks.allowed-private-hosts", () -> "localhost,127.0.0.1");
             registry.add("app.webhooks.disable-after-failures", () -> "2");
+            // Пара VAPID на прогон и push-сервис на localhost (в бою — только известные push-сервисы).
+            registry.add("app.notification.push.vapid-public-key", () -> VAPID[0]);
+            registry.add("app.notification.push.vapid-private-key", () -> VAPID[1]);
         };
     }
 
