@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
@@ -21,6 +22,28 @@ import org.testcontainers.rabbitmq.RabbitMQContainer;
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
+
+    /** {@code @Primary}: настоящий gRPC-клиент в контексте есть, но его канал ленивый и никуда не ходит. */
+    @Bean
+    @Primary
+    TestRestaurantAccess testRestaurantAccess() {
+        return new TestRestaurantAccess();
+    }
+
+    /**
+     * Ключ шифрования секретов вебхуков: без него сервис не стартует, а в тестах он нужен любой.
+     * Короткая лестница повторов — чтобы цепочка попыток укладывалась в секунды; localhost
+     * разрешён — получатели в тестах живут на нём.
+     */
+    @Bean
+    DynamicPropertyRegistrar webhookTestProperties() {
+        return registry -> {
+            registry.add("app.webhooks.secret-key", () -> "MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=");
+            registry.add("app.webhooks.retry-delays", () -> "PT0.3S,PT0.6S");
+            registry.add("app.webhooks.allowed-private-hosts", () -> "localhost,127.0.0.1");
+            registry.add("app.webhooks.disable-after-failures", () -> "2");
+        };
+    }
 
     @Bean
     @ServiceConnection

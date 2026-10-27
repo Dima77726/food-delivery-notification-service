@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-webhooks
+      author: dima
+      changes:
+        - sqlFile:
+            path: sql/003-webhooks.sql
+            relativeToChangelogFile: true
+            splitStatements: true

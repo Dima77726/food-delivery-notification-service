@@ -137,6 +137,23 @@ app:
     sweep-stale-after: ${NOTIFICATION_SWEEP_STALE_AFTER:PT5M}
     sweep-enabled: ${NOTIFICATION_SWEEP_ENABLED:true}
 
+  webhooks:
+    # Исходящие вебхуки ресторанам (см. пакет webhook и учебник, глава 3).
+    # Ключ AES-256 в Base64 для секретов подписок в базе. Значения по умолчанию нет: без него вебхуки выключены (API — 503).
+    # Сгенерировать: openssl rand -base64 32
+    secret-key: ${WEBHOOK_SECRET_KEY:}
+    consumer-group: ${WEBHOOK_CONSUMER_GROUP:notification-webhooks}
+    # Лестница пауз между попытками: ступень — очередь RabbitMQ со своим TTL. Попыток на одну больше.
+    retry-delays: ${WEBHOOK_RETRY_DELAYS:PT10S,PT1M,PT5M,PT30M,PT2H}
+    disable-after-failures: ${WEBHOOK_DISABLE_AFTER_FAILURES:20}
+    # Хосты, которым можно http и внутренние адреса (приёмник-демонстрация в compose). Остальным — только публичный https.
+    allowed-private-hosts: ${WEBHOOK_ALLOWED_PRIVATE_HOSTS:}
+    connect-timeout: ${WEBHOOK_CONNECT_TIMEOUT:PT2S}
+    request-timeout: ${WEBHOOK_REQUEST_TIMEOUT:PT5S}
+    concurrency: ${WEBHOOK_CONCURRENCY:2}
+    sweep-interval: ${WEBHOOK_SWEEP_INTERVAL:PT1M}
+    sweep-stale-after: ${WEBHOOK_SWEEP_STALE_AFTER:PT2M}
+
   security:
     jwt:
       # Открытые ключи сервиса пользователей. Секрета подписи у сервиса нет.
