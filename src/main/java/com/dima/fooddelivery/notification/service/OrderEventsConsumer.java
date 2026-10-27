@@ -3,6 +3,8 @@ package com.dima.fooddelivery.notification.service;
 import com.dima.fooddelivery.contracts.order.OrderEventTopics;
 import com.dima.fooddelivery.contracts.order.OrderIntegrationEvent;
 import com.dima.fooddelivery.notification.domain.NotificationChannel;
+import com.dima.fooddelivery.notification.push.PushSubscriptionRepository;
+import com.dima.fooddelivery.notification.push.WebPushProperties;
 import com.dima.fooddelivery.notification.telegram.TelegramLinkService;
 import com.dima.fooddelivery.notification.web.RequestContext;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +63,9 @@ public class OrderEventsConsumer {
     /** Пуст, пока канал Telegram выключен: тогда события обрабатываются как раньше. */
     private final ObjectProvider<TelegramLinkService> telegramLinks;
 
+    private final PushSubscriptionRepository pushSubscriptions;
+    private final WebPushProperties pushProperties;
+
     @KafkaListener(
             topics = OrderEventTopics.ORDER_EVENTS,
             groupId = "${spring.kafka.consumer.group-id}"
@@ -100,6 +105,11 @@ public class OrderEventsConsumer {
 
         if (telegram != null && telegram.isLinked(event.customerId())) {
             enqueue(event, NotificationChannel.TELEGRAM, message, correlationId);
+        }
+
+        // Web Push — тем, кто разрешил уведомления хотя бы в одном браузере.
+        if (pushProperties.configured() && pushSubscriptions.hasAny(event.customerId())) {
+            enqueue(event, NotificationChannel.PUSH, message, correlationId);
         }
     }
 

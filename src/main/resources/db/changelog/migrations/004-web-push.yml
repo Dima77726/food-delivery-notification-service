@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-web-push
+      author: dima
+      changes:
+        - sqlFile:
+            path: sql/004-web-push.sql
+            relativeToChangelogFile: true
+            splitStatements: true
