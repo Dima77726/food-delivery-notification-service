@@ -11,8 +11,9 @@ import java.util.List;
 /**
  * Опрашивает бота: забирает новые сообщения и отдаёт их {@link TelegramBotHandler}.
  *
- * <p><b>Long polling, а не вебхук.</b> Вебхуку нужен адрес, доступный из интернета, а у локального
- * стека его нет; опросу достаточно исходящего соединения. Запрос висит у Telegram до
+ * <p><b>Long polling по умолчанию, вебхук — по настройке.</b> Вебхуку нужен адрес, доступный из
+ * интернета по https, а у локального стека его нет; опросу достаточно исходящего соединения.
+ * Режим вебхука ({@code app.notification.telegram.mode=webhook}) — {@link TelegramWebhookController}. Запрос висит у Telegram до
  * {@code pollTimeout}, пока нет сообщений, поэтому пустой бот почти не нагружает ни его, ни нас.
  *
  * <p><b>Свой поток, не планировщик Spring.</b> Опрос блокируется на десятки секунд, а планировщик
@@ -59,6 +60,10 @@ public class TelegramBotPoller {
 
     @PostConstruct
     void start() {
+        if (properties.webhookMode()) {
+            log.info("Telegram-бот в режиме вебхука: опрос не запускается (см. TelegramWebhookController)");
+            return;
+        }
         if (!properties.pollingEnabled()) {
             log.info("Опрос Telegram-бота выключен настройкой; отправка уведомлений работает");
             return;
@@ -83,6 +88,14 @@ public class TelegramBotPoller {
 
     private void loop() {
         long backoff = 1_000;
+
+        // Вебхук, оставшийся от режима webhook, блокирует getUpdates (409). Снимаем его один раз
+        // на старте; не вышло — цикл ниже всё равно повторит попытки с паузой.
+        try {
+            client.deleteWebhook();
+        } catch (TelegramClient.TelegramApiException exception) {
+            log.warn("Не удалось снять вебхук Telegram перед опросом: {}", exception.getMessage());
+        }
 
         while (running) {
             try {

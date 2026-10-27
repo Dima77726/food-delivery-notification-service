@@ -28,7 +28,8 @@ class TelegramBotPollerTest {
     private final TelegramLinkRepository repository = mock(TelegramLinkRepository.class);
     private final TelegramProperties properties = new TelegramProperties(
             true, "token", "bot", "http://localhost", true,
-            Duration.ofSeconds(25), Duration.ofMinutes(15), Duration.ofSeconds(3), Duration.ofSeconds(10)
+            Duration.ofSeconds(25), Duration.ofMinutes(15), Duration.ofSeconds(3), Duration.ofSeconds(10),
+            "polling", null, null
     );
 
     private final TelegramBotPoller poller = new TelegramBotPoller(client, handler, repository, properties);
