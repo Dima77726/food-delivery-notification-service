@@ -128,6 +128,13 @@ app:
       bot-username: ${TELEGRAM_BOT_USERNAME:}
       # Опрос ведёт один экземпляр сервиса; на остальных false (иначе Telegram отвечает 409).
       polling-enabled: ${TELEGRAM_POLLING_ENABLED:true}
+      # Как бот получает сообщения: polling — сам спрашивает Telegram (getUpdates, работает без внешнего
+      # адреса); webhook — Telegram присылает их POST-запросом на публичный https-адрес.
+      mode: ${TELEGRAM_MODE:polling}
+      # Для режима webhook: публичный адрес шлюза (https://…), к нему добавится /api/v1/webhooks/telegram.
+      webhook-public-url: ${TELEGRAM_WEBHOOK_PUBLIC_URL:}
+      # Секрет, который Telegram вернёт в заголовке X-Telegram-Bot-Api-Secret-Token. 1–256 символов A-Z a-z 0-9 _ -.
+      webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
     # Пауза перед повтором — TTL очереди ожидания (см. NotificationTopology).
     retry-delay: ${NOTIFICATION_RETRY_DELAY:PT10S}
     # Сколько раз пытаться отправить, прежде чем отложить уведомление в notifications.dead.

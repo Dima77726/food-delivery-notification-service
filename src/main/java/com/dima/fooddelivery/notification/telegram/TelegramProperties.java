@@ -29,6 +29,13 @@ public record TelegramProperties(
         @DefaultValue("25s") Duration pollTimeout,
         @DefaultValue("15m") Duration linkTtl,
         @DefaultValue("3s") Duration connectTimeout,
-        @DefaultValue("10s") Duration readTimeout
+        @DefaultValue("10s") Duration readTimeout,
+        @DefaultValue("polling") String mode,
+        String webhookPublicUrl,
+        String webhookSecret
 ) {
+
+    public boolean webhookMode() {
+        return "webhook".equalsIgnoreCase(mode);
+    }
 }

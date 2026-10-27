@@ -167,7 +167,8 @@ class HttpTelegramClientTest {
     void shouldRefuseToStartWithoutToken() {
         TelegramProperties properties = new TelegramProperties(
                 true, "", "bot", "http://localhost:1", true,
-                Duration.ofSeconds(1), Duration.ofMinutes(15), Duration.ofSeconds(1), Duration.ofSeconds(1)
+                Duration.ofSeconds(1), Duration.ofMinutes(15), Duration.ofSeconds(1), Duration.ofSeconds(1),
+                "polling", null, null
         );
 
         assertThrows(IllegalStateException.class,
@@ -199,7 +200,8 @@ class HttpTelegramClientTest {
 
         TelegramProperties properties = new TelegramProperties(
                 true, TOKEN, "test_bot", "http://localhost:" + server.getAddress().getPort(), true,
-                Duration.ofSeconds(1), Duration.ofMinutes(15), Duration.ofSeconds(2), Duration.ofSeconds(5)
+                Duration.ofSeconds(1), Duration.ofMinutes(15), Duration.ofSeconds(2), Duration.ofSeconds(5),
+                "polling", null, null
         );
 
         return new HttpTelegramClient(properties, objectMapper);

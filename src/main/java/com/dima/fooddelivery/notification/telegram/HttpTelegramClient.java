@@ -87,18 +87,38 @@ public class HttpTelegramClient implements TelegramClient {
         List<Update> updates = new ArrayList<>();
 
         for (JsonNode item : result) {
-            JsonNode message = item.path("message");
-
-            // Обновление без текста (стикер, фото) читается и пропускается: offset всё равно двигается.
-            updates.add(new Update(
-                    item.path("update_id").asLong(),
-                    message.path("chat").path("id").asLong(),
-                    message.path("chat").path("type").asString(""),
-                    message.path("text").asString("")
-            ));
+            updates.add(toUpdate(item));
         }
 
         return updates;
+    }
+
+    @Override
+    public void setWebhook(String url, String secretToken) {
+        call("setWebhook", Map.of(
+                "url", url,
+                "secret_token", secretToken,
+                "allowed_updates", List.of("message")
+        ));
+    }
+
+    @Override
+    public void deleteWebhook() {
+        call("deleteWebhook", Map.of("drop_pending_updates", false));
+    }
+
+    /**
+     * Обновление в том виде, в каком его присылают и getUpdates, и вебхук — формат один.
+     * Обновление без текста (стикер, фото) читается и пропускается: offset всё равно двигается.
+     */
+    static Update toUpdate(JsonNode item) {
+        JsonNode message = item.path("message");
+        return new Update(
+                item.path("update_id").asLong(),
+                message.path("chat").path("id").asLong(),
+                message.path("chat").path("type").asString(""),
+                message.path("text").asString("")
+        );
     }
 
     private JsonNode call(String method, Map<String, Object> body) {

@@ -21,6 +21,16 @@ public interface TelegramClient {
     List<Update> getUpdates(long offset, int timeoutSeconds);
 
     /**
+     * Включает режим вебхука: Telegram сам присылает обновления POST-запросом на {@code url}
+     * с заголовком {@code X-Telegram-Bot-Api-Secret-Token: secretToken}. Пока вебхук стоит,
+     * {@link #getUpdates} отвечает 409.
+     */
+    void setWebhook(String url, String secretToken);
+
+    /** Снимает вебхук — без этого опрос ({@link #getUpdates}) не работает. Накопленное не сбрасывается. */
+    void deleteWebhook();
+
+    /**
      * Входящее сообщение боту. Остальные виды обновлений (правка, нажатие кнопки…) сюда не попадают —
      * бот на них не рассчитан.
      *
