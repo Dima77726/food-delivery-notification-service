@@ -73,6 +73,7 @@ public class TelegramLinkService {
         }
 
         repository.link(userId.get(), chatId);
+        repository.clearUnlinkReason(userId.get());
 
         log.info("Telegram привязан: userId={}", userId.get());
 
@@ -114,6 +115,23 @@ public class TelegramLinkService {
         }
 
         return removed;
+    }
+
+    /**
+     * Чат недоступен не по воле пользователя: бота заблокировали (403) или чат удалён. Привязка снимается, а
+     * причина сохраняется — в настройках человек увидит, почему уведомления перестали приходить.
+     */
+    @Transactional
+    public void unlinkUnreachable(long chatId, String reason) {
+        repository.unlinkChatReturningUser(chatId).ifPresent(userId -> {
+            repository.saveUnlinkReason(userId, reason);
+            log.info("Telegram отвязан: чат недоступен, userId={}, reason={}", userId, reason);
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<String> unlinkReason(Long userId) {
+        return repository.findUnlinkReason(userId);
     }
 
     static String hash(String code) {

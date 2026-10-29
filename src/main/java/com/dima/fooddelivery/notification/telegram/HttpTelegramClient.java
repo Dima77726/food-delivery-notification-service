@@ -76,6 +76,20 @@ public class HttpTelegramClient implements TelegramClient {
     }
 
     @Override
+    public void sendMessage(long chatId, String text, String buttonText, String buttonUrl) {
+        if (buttonUrl == null || !buttonUrl.startsWith("https://")) {
+            // Telegram отвергает в кнопке http- и локальные адреса — ссылка уходит текстом.
+            TelegramClient.super.sendMessage(chatId, text, buttonText, buttonUrl);
+            return;
+        }
+        call("sendMessage", Map.of(
+                "chat_id", chatId,
+                "text", text,
+                "reply_markup", Map.of("inline_keyboard", List.of(List.of(Map.of("text", buttonText, "url", buttonUrl))))
+        ));
+    }
+
+    @Override
     public List<Update> getUpdates(long offset, int timeoutSeconds) {
         JsonNode result = call("getUpdates", Map.of(
                 "offset", offset,

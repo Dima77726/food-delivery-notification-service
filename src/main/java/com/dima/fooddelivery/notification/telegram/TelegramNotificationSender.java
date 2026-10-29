@@ -55,7 +55,7 @@ public class TelegramNotificationSender implements ChannelNotificationSender {
             client.sendMessage(chatId, textOf(notification));
         } catch (TelegramClient.TelegramApiException exception) {
             if (exception.isChatUnavailable()) {
-                links.unlinkChat(chatId);
+                links.unlinkUnreachable(chatId, exception.status() == 403 ? "BOT_BLOCKED" : "CHAT_NOT_FOUND");
 
                 throw new PermanentDeliveryException(
                         "Чат Telegram недоступен, привязка снята: userId=" + notification.recipientId(), exception

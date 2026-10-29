@@ -135,6 +135,10 @@ app:
       webhook-public-url: ${TELEGRAM_WEBHOOK_PUBLIC_URL:}
       # Секрет, который Telegram вернёт в заголовке X-Telegram-Bot-Api-Secret-Token. 1–256 символов A-Z a-z 0-9 _ -.
       webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+      # Уведомления мессенджера (очередь notifications.messenger.telegram) — только этим пользователям, через
+      # запятую. Для стенда с настоящим ботом: сообщения не уйдут никому, кроме явно названных тестовых аккаунтов.
+      # Пусто — всем, кто привязал Telegram.
+      messenger-allowed-user-ids: ${TELEGRAM_MESSENGER_ALLOWED_USER_IDS:}
 
     push:
       # Web Push (VAPID, RFC 8291). Пара ключей P-256 в Base64url; без неё push выключен (API — 503).

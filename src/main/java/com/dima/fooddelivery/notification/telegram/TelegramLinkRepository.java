@@ -107,6 +107,28 @@ public class TelegramLinkRepository {
                 new MapSqlParameterSource("chatId", chatId)) > 0;
     }
 
+    public Optional<Long> unlinkChatReturningUser(long chatId) {
+        return jdbc.query("DELETE FROM telegram_link WHERE chat_id = :chatId RETURNING user_id",
+                new MapSqlParameterSource("chatId", chatId), (rs, rowNum) -> rs.getLong("user_id")).stream().findFirst();
+    }
+
+    public void saveUnlinkReason(long userId, String reason) {
+        jdbc.update("""
+                        INSERT INTO telegram_unlink_reason (user_id, reason) VALUES (:userId, :reason)
+                        ON CONFLICT (user_id) DO UPDATE SET reason = EXCLUDED.reason, unlinked_at = CURRENT_TIMESTAMP
+                        """,
+                new MapSqlParameterSource().addValue("userId", userId).addValue("reason", reason));
+    }
+
+    public void clearUnlinkReason(long userId) {
+        jdbc.update("DELETE FROM telegram_unlink_reason WHERE user_id = :userId", new MapSqlParameterSource("userId", userId));
+    }
+
+    public Optional<String> findUnlinkReason(Long userId) {
+        return jdbc.query("SELECT reason FROM telegram_unlink_reason WHERE user_id = :userId",
+                new MapSqlParameterSource("userId", userId), (rs, rowNum) -> rs.getString("reason")).stream().findFirst();
+    }
+
     /** С какого {@code update_id} продолжать опрос; 0, если опрос ещё не начинался. */
     public long loadNextOffset() {
         return jdbc.query(
