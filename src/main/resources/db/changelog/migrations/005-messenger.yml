@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-messenger
+      author: dima
+      changes:
+        - sqlFile:
+            path: sql/005-messenger.sql
+            relativeToChangelogFile: true
+            splitStatements: true

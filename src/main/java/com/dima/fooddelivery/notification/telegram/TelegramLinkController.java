@@ -50,8 +50,8 @@ public class TelegramLinkController {
         Long userId = currentUser.requireId();
 
         return links.linkedAt(userId)
-                .map(linkedAt -> new StatusResponse(true, linkedAt))
-                .orElse(new StatusResponse(false, null));
+                .map(linkedAt -> new StatusResponse(true, linkedAt, null))
+                .orElse(new StatusResponse(false, null, links.unlinkReason(userId).orElse(null)));
     }
 
     @DeleteMapping
@@ -64,6 +64,10 @@ public class TelegramLinkController {
     public record LinkResponse(String deepLink, OffsetDateTime expiresAt) {
     }
 
-    public record StatusResponse(boolean linked, OffsetDateTime linkedAt) {
+    /**
+     * @param unlinkReason почему привязки нет, если её сняли не вы: {@code BOT_BLOCKED} — бот заблокирован,
+     *                     {@code CHAT_NOT_FOUND} — чат удалён; {@code null} — не привязывали или отвязали сами
+     */
+    public record StatusResponse(boolean linked, OffsetDateTime linkedAt, String unlinkReason) {
     }
 }

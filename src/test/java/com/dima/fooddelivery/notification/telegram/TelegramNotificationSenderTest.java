@@ -62,7 +62,7 @@ class TelegramNotificationSenderTest {
         assertThrows(PermanentDeliveryException.class, () -> sender.send(notification(7L, "Тема", "Текст")));
 
         // Писать в такой чат больше нельзя: привязка снимается, чтобы не пытаться на каждом заказе.
-        verify(links).unlinkChat(555L);
+        verify(links).unlinkUnreachable(555L, "BOT_BLOCKED");
     }
 
     @Test
@@ -77,7 +77,7 @@ class TelegramNotificationSenderTest {
 
         // Временный сбой уходит наружу как есть и не является PermanentDeliveryException: очередь повторит.
         assertSame(rateLimit, thrown);
-        verify(links, never()).unlinkChat(anyLong());
+        verify(links, never()).unlinkUnreachable(anyLong(), org.mockito.ArgumentMatchers.anyString());
     }
 
     /** Лимит Bot API — 4096 символов; длиннее — отказ 400, который не отличить от других 400. */

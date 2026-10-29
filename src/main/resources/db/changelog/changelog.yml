@@ -11,3 +11,6 @@ databaseChangeLog:
   - include:
       file: migrations/004-web-push.yml
       relativeToChangelogFile: true
+  - include:
+      file: migrations/005-messenger.yml
+      relativeToChangelogFile: true

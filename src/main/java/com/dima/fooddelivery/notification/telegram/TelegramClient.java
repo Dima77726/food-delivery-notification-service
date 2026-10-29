@@ -14,6 +14,16 @@ public interface TelegramClient {
     void sendMessage(long chatId, String text);
 
     /**
+     * Сообщение с кнопкой-ссылкой под ним («Открыть чат»). Telegram принимает в кнопке только адреса, которые
+     * может открыть сам пользователь; для http и localhost кнопка не годится — тогда ссылка уходит текстом.
+     *
+     * @throws TelegramApiException если Telegram отказал или не ответил
+     */
+    default void sendMessage(long chatId, String text, String buttonText, String buttonUrl) {
+        sendMessage(chatId, buttonUrl == null ? text : text + "\n" + buttonUrl);
+    }
+
+    /**
      * Новые обновления бота. Запрос висит до {@code timeoutSeconds}, пока их нет (long polling).
      *
      * @param offset с какого {@code update_id} читать; меньшие Telegram считает прочитанными
